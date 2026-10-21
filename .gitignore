@@ -1,0 +1,21 @@
+**/__pycache__/**
+/ocrenv/
+/build/
+/__pycache__/
+/ndlocr-lite-gui/build/
+/ndlocr-lite-gui/src/
+/ndlocr-lite-gui/uicomponent/
+/ndlocr-lite-gui/userconf.yaml
+/ndlocr-lite-gui/debug.log
+/ndlocr-lite-gui/4ab7ecc3-53fb-b3e7-64e8-a809b5a483d2/
+/4ab7ecc3-53fb-b3e7-64e8-a809b5a483d2/
+**/.venv/**
+uv.lock
+
+# 运行时生成的配置
+ndlocr-lite-gui/userconf.yaml
+__pycache__/
+*.pyc
+
+# Windows 便携版构建产物（467MB，通过 GitHub Release 分发，不入库）
+/windows-build/
