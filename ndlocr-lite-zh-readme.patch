@@ -1,0 +1,126 @@
+﻿diff --git "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\ndlocr-lite-gui/README.md" "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\ndlocr-lite-gui/README.md"
+index 6b6f6ad..b52a832 100644
+--- "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\ndlocr-lite-gui/README.md"
++++ "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\ndlocr-lite-gui/README.md"
+@@ -1,4 +1,4 @@
+-# NDLOCR-Liteのデスクトップアプリケーション
++﻿# NDLOCR-Liteのデスクトップアプリケーション
+ 
+ NDLOCR-Liteの使い方を説明します。
+ 
+@@ -38,7 +38,7 @@ https://flet.dev/docs/publish/windows/
+ #(コマンドプロンプトを利用、ndlocr-lite-guiと同階層で実行する)
+ python3 -m venv ocrenv
+ .\ocrenv\Scripts\activate
+-pip install flet==0.27.6
++pip install flet==0.86.5
+ xcopy ..\src .\src
+ flet build windows
+ ```
+@@ -49,7 +49,7 @@ flet build windows
+ #(ndlocr-lite-guiと同階層で実行する)
+ python3 -m venv ocrenv
+ source ./ocrenv/bin/activate
+-pip install flet==0.27.6
++pip install flet==0.86.5
+ cp -r ../src .
+ flet build macos
+ ```
+@@ -59,7 +59,96 @@ flet build macos
+ #(ndlocr-lite-guiと同階層で実行する)
+ python3 -m venv ocrenv
+ source ./ocrenv/bin/activate
+-pip install flet==0.27.6
++pip install flet==0.86.5
+ cp -r ../src .
+ flet build linux
+ ```
++
++## 表示言語の切り替え（日本語 / English / 简体中文）
++
++画面上部のセグメントボタンで表示言語を切り替えられます。選択内容は `userconf.yaml`（`langcode`）に保存され、次回起動時にも引き継がれます。
++
++- 日本語（既定）
++- English
++- 简体中文
++
++既定の言語を変えたい場合は、`userconf.yaml` の `langcode` を直接編集してください。
++
++### 表示言語を追加する場合
++
++1. `src/uicomponent/localelabel.py` の `TRANSLATIONS` に、新しい言語コードの訳文を追記します（未訳の項目は en → ja の順で自動フォールバックします）。
++2. `ndlocr-lite-gui/main.py` の `UI_LANGCODES` / `UI_LANGCODE_TITLES` / `ft.LocaleConfiguration.supported_locales` / `handle_locale_change()` に新しい言語を追加します。
++3. `py -m unittest ndlocr-lite-gui/tests/test_localization.py -v` で訳文の抜けを確認します。
++
++### オプション機能モジュール（llm / data_pool / table_structure）の文言
++
++`src/optional_features/` 配下のモジュールは本リポジトリには含まれておらず、単体で配布されます。これらの画面文言は次の2通りで多言語化できます（モジュールのソース改変は不要）。
++
++- `uicomponent.localelabel.register_translations({...})` でモジュール側の文言を共通辞書に登録する
++- `uicomponent.localelabel.translate_literal()` / `localize_tree()` による「原文 → 訳文」の一括置換（GUI 側で自動適用）
++
++未訳の日本語文言を洗い出したい場合は、環境変数 `NDLOCR_GUI_DUMP_UNTRANSLATED=1` を設定して起動すると、`untranslated_gui_strings.txt` に一覧が出力されます。
++
++## 简体中文说明
++
++界面语言支持 **日本語 / English / 简体中文** 三档，右上角分段按钮切换，选择会写入 `userconf.yaml` 的 `langcode`，重启后保持。
++
++### 修改或补充中文文案
++
++只需要改 `src/uicomponent/localelabel.py` 里的 `TRANSLATIONS`，每条形如：
++
++```python
++"main_explain": {
++    "ja": "処理対象と出力先を選択して「OCR」ボタンを押してください",
++    "en": "Please select target images and output folder, then press OCR",
++    "zh": "请选择要处理的图片和输出目录，然后点击「OCR」按钮",
++},
++```
++
++- 缺少某个语言时按 **en → ja** 自动回退，不会因为漏译而崩溃；
++- 带占位符的条目（如 `{completed}`、`{elapsed:.2f}`）保持占位符不变即可；
++- 改完跑一下校验：`py -m unittest ndlocr-lite-gui/tests/test_localization.py -v`。
++
++### 新增第三种以外的语言
++
++1. 在 `TRANSLATIONS` 每个条目里补上新语言代码；
++2. 在 `ndlocr-lite-gui/main.py` 的 `UI_LANGCODES`、`UI_LANGCODE_TITLES`、`ft.LocaleConfiguration.supported_locales` 与 `handle_locale_change()` 里加上对应项。
++
++### 可选功能模块（LLM 校正 / DataPool / 表结构识别）的中文化
++
++这三个模块（`src/optional_features/llm.py`、`data_pool.py`、`table_structure.py`）不在公开仓库内，是随发布包单独分发的，因此**无法直接改它们的源码文案**。可用的做法：
++
++1. **登记文案**（推荐，需能调用 Python）：在任何早于界面渲染的位置执行
++
++   ```python
++   from uicomponent.localelabel import register_translations
++
++   register_translations({
++       "llm_fix_btn": {"ja": "LLM補正", "en": "LLM Correct", "zh": "LLM 校正"},
++   })
++   ```
++
++2. **原文整体替换**：GUI 渲染前会自动对这几个模块搭建的控件树执行一次替换——只要字典里某条目的 `ja`/`en` 值与控件上的文字完全一致，就会换成当前语言。所以把它们的日语原文登记进字典即可，模块本身不需要改。
++
++3. **找出还没翻译的原文**：设置环境变量后启动
++
++   ```bash
++   set NDLOCR_GUI_DUMP_UNTRANSLATED=1   # Windows (PowerShell: $env:NDLOCR_GUI_DUMP_UNTRANSLATED=1)
++   ```
++
++   会在数据目录生成 `untranslated_gui_strings.txt`，把这些原文逐条补进 `TRANSLATIONS` 即可。
++
++> 注意：模块内部的 `if langcode == 'ja' ... else ...` 判断在中文界面下会走英文分支（不会报错），这也是推荐用上面两种方式统一的原因。
++
++## 付録：Flet クライアントの取得に失敗する場合 / 附：GitHub 访问受限时如何启动
++
++初回起動時、Flet は https://github.com/flet-dev/flet/releases からデスクトップクライアント（`flet-windows.zip`、約 40MB）を取得します。社内プロキシやネットワーク制限で失敗する場合は、その zip を手動でダウンロードし、環境変数 `FLET_CLIENT_URL` にファイル URL を設定してから起動してください。
++
++```powershell
++$env:FLET_CLIENT_URL = "file:///C:/path/to/flet-windows.zip"
++python main.py
++```
++
++中文：首次启动时 Flet 会从 GitHub Releases 下载约 40MB 的桌面客户端（`flet-windows.zip`）。如果因为网络原因失败，可以手动下载该 zip 后用环境变量指定本地路径（如上），之后客户端会被缓存到 `~/.flet/client`，只需设置一次。
++
++> 验证环境：Windows 11 / Python 3.12 / flet 0.86.5 / onnxruntime 1.26.0。`pip install -r requirements.txt` 后 `python main.py` 即可运行，界面右上角可切换 日本語 / English / 简体中文。

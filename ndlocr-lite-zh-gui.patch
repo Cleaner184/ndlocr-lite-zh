@@ -1,0 +1,554 @@
+﻿diff --git "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\ndlocr-lite-gui/main.py" "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\ndlocr-lite-gui/main.py"
+index 19c61ee..93ed8d8 100644
+--- "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\ndlocr-lite-gui/main.py"
++++ "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\ndlocr-lite-gui/main.py"
+@@ -28,7 +28,7 @@ import glob
+ import ctypes
+ from io import BytesIO
+ from gui_config import build_default_config
+-from uicomponent.localelabel import TRANSLATIONS
++from uicomponent.localelabel import TRANSLATIONS, get_text, localize_tree
+ from uicomponent.textdaisy import TextDaisyExporter
+ from collections import Counter
+ from optional_features import load_optional_features
+@@ -37,6 +37,51 @@ from version import __version__
+ 
+ name = 'NDLOCR-Lite-GUI'
+ 
++# 界面语言（与 src/uicomponent/localelabel.py 中的语言代码一致）
++UI_LANGCODES = ('ja', 'en', 'zh')
++UI_LANGCODE_TITLES = {
++    'ja': '日本語',
++    'en': 'English',
++    'zh': '简体中文',
++}
++
++
++def tr(key, langcode, **kwargs):
++    """按当前界面语言取文本（zh/ja/en），缺失时回退。"""
++    return get_text(key, langcode, **kwargs)
++
++
++def dump_untranslated_strings(strings):
++    """设置环境变量 NDLOCR_GUI_DUMP_UNTRANSLATED=1 时，导出未翻译的日文文案。"""
++    if not strings or not os.environ.get('NDLOCR_GUI_DUMP_UNTRANSLATED'):
++        return
++    out_path = APP_DATA_DIR / 'untranslated_gui_strings.txt'
++    try:
++        APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
++        existing = set()
++        if out_path.exists():
++            existing = {
++                line.rstrip('\n')
++                for line in out_path.read_text(encoding='utf-8').splitlines()
++            }
++        merged = sorted(existing | set(strings))
++        out_path.write_text('\n'.join(merged) + '\n', encoding='utf-8')
++        print(f'[i18n] untranslated UI strings -> {out_path}')
++    except Exception as ex:
++        print(f'[i18n] failed to dump untranslated strings: {ex}')
++
++
++def build_models_ready_message(langcode, elapsed, table_feature_enabled, table_error):
++    """OCR 模型加载完成后的状态提示。"""
++    if not table_feature_enabled:
++        key = 'main_models_ready'
++    elif table_error is None:
++        key = 'main_models_ready_with_table'
++    else:
++        key = 'main_models_ready_table_failed'
++    return get_text(key, langcode, elapsed=elapsed)
++
++
+ _feature_modules = load_optional_features()
+ DATA_POOL_FEATURE = (
+     _feature_modules.data_pool.create_feature()
+@@ -293,16 +338,16 @@ class ImageSelector:
+                 self.overlay,
+             ],
+         )
+-        self.cropocr_btn = ft.Button(TRANSLATIONS['imageselector_cropocr_btn'][self.langcode], on_click=self.crop_region)
++        self.cropocr_btn = ft.Button(tr('imageselector_cropocr_btn', self.langcode), on_click=self.crop_region)
+         self.dialog = ft.AlertDialog(
+             modal=True,
+             content=self.image_stack,
+             actions=[
+-                ft.Button(TRANSLATIONS['imageselector_zoom_btn'][self.langcode], icon=ft.Icons.ZOOM_IN, on_click=self.open_zoom_page),
+-                ft.Button(TRANSLATIONS['imageselector_prev_btn'][self.langcode], on_click=self.prev_page),
+-                ft.Button(TRANSLATIONS['imageselector_next_btn'][self.langcode], on_click=self.next_page),
++                ft.Button(tr('imageselector_zoom_btn', self.langcode), icon=ft.Icons.ZOOM_IN, on_click=self.open_zoom_page),
++                ft.Button(tr('imageselector_prev_btn', self.langcode), on_click=self.prev_page),
++                ft.Button(tr('imageselector_next_btn', self.langcode), on_click=self.next_page),
+                 self.cropocr_btn,
+-                ft.Button(TRANSLATIONS['common_cancel'][self.langcode], on_click=self.close_dialog),
++                ft.Button(tr('common_cancel', self.langcode), on_click=self.close_dialog),
+             ],
+         )
+         zoom_img = ft.InteractiveViewer(
+@@ -316,7 +361,7 @@ class ImageSelector:
+             modal=True,
+             content=zoom_img,
+             actions=[
+-                ft.Button(TRANSLATIONS['common_cancel'][self.langcode], on_click=self.close_zoom_page),
++                ft.Button(tr('common_cancel', self.langcode), on_click=self.close_zoom_page),
+             ],
+         )
+         self.resulttext = ft.Markdown(
+@@ -332,7 +377,7 @@ class ImageSelector:
+             visible=not bool(self.config_obj.get('result_markdown_display', False)),
+         )
+         self.result_view_switch = ft.Switch(
+-            label='整形表示（Markdown）',
++            label=tr('common_view_markdown', self.langcode),
+             value=bool(self.config_obj.get('result_markdown_display', False)),
+             on_change=self.change_result_view_mode,
+         )
+@@ -359,7 +404,7 @@ class ImageSelector:
+         )
+ 
+         self.result_dialog = ft.AlertDialog(
+-            title=ft.Text(TRANSLATIONS['imageselector_result_title'][self.langcode]),
++            title=ft.Text(tr('imageselector_result_title', self.langcode)),
+             modal=True,
+             content=ft.Row([self.crop_image_int, self.result_text_col]),
+             actions=[
+@@ -539,8 +584,8 @@ class ImageSelector:
+             self.result_plain_text.value = page_result['text']
+             self.resulttext.value = display_markdown
+         except Exception as ex:
+-            self.result_plain_text.value = f'エラーが発生しました: {ex}'
+-            self.resulttext.value = f'エラーが発生しました: {ex}'
++            self.result_plain_text.value = tr('common_error_occurred', self.langcode, error=ex)
++            self.resulttext.value = tr('common_error_occurred', self.langcode, error=ex)
+         finally:
+             self.cropocr_btn.disabled = False
+             self.open_result_page()
+@@ -592,14 +637,14 @@ class CaptureTool:
+             fit=ft.BoxFit.CONTAIN,
+             gapless_playback=True,
+         )
+-        self.retry_btn = ft.Button(TRANSLATIONS['capturetool_retry_btn'][self.langcode], on_click=self.start_capture)
+-        self.cboc_fixed = ft.Checkbox(label=TRANSLATIONS['capturetool_fixregion'][self.langcode], value=False, disabled=True)
++        self.retry_btn = ft.Button(tr('capturetool_retry_btn', self.langcode), on_click=self.start_capture)
++        self.cboc_fixed = ft.Checkbox(label=tr('capturetool_fixregion', self.langcode), value=False, disabled=True)
+         self.cb_table_structure = (
+             self.table_feature.create_capture_control(self.config_obj)
+             if self.table_feature is not None
+             else None
+         )
+-        self.ocr_btn = ft.Button(TRANSLATIONS['capturetool_ocr_button'][self.langcode], on_click=self.mini_ocr)
++        self.ocr_btn = ft.Button(tr('capturetool_ocr_button', self.langcode), on_click=self.mini_ocr)
+ 
+         self.errorlog = ft.Text('')
+         self.dialog_content = ft.Column(
+@@ -618,7 +663,7 @@ class CaptureTool:
+ 
+         self.dialog = ft.AlertDialog(
+             modal=True,
+-            title=ft.Text(TRANSLATIONS['capturetool_result_title'][self.langcode]),
++            title=ft.Text(tr('capturetool_result_title', self.langcode)),
+             content=self.dialog_content,
+             actions=[
+                 ft.Row([
+@@ -636,7 +681,7 @@ class CaptureTool:
+                         tight=True,
+                     ),
+                     self.ocr_btn,
+-                    ft.Button(TRANSLATIONS['common_close'][self.langcode], on_click=self.close_dialog),
++                    ft.Button(tr('common_close', self.langcode), on_click=self.close_dialog),
+                 ]),
+             ],
+             actions_alignment=ft.MainAxisAlignment.END,
+@@ -654,7 +699,7 @@ class CaptureTool:
+             visible=not bool(self.config_obj.get('result_markdown_display', False)),
+         )
+         self.result_view_switch = ft.Switch(
+-            label='整形表示（Markdown）',
++            label=tr('common_view_markdown', self.langcode),
+             value=bool(self.config_obj.get('result_markdown_display', False)),
+             on_change=self.change_result_view_mode,
+         )
+@@ -675,7 +720,7 @@ class CaptureTool:
+             height=300,
+         )
+         self.result_dialog = ft.AlertDialog(
+-            title=ft.Text(TRANSLATIONS['capturetool_resultocr_title'][self.langcode]),
++            title=ft.Text(tr('capturetool_resultocr_title', self.langcode)),
+             modal=True,
+             content=ft.Row(
+                 controls=[self.crop_image_int, self.result_text_col],
+@@ -684,7 +729,7 @@ class CaptureTool:
+             ),
+             actions=[
+                 self.resultsmessage,
+-                ft.Button(TRANSLATIONS['common_close'][self.langcode], on_click=self.close_result_page),
++                ft.Button(tr('common_close', self.langcode), on_click=self.close_result_page),
+             ],
+         )
+         self.overlay_stack = ft.Stack(
+@@ -864,8 +909,8 @@ class CaptureTool:
+ 
+         except Exception as e:
+             print(f'OCR Error: {e}')
+-            self.result_plain_text.value = f'エラーが発生しました: {e}'
+-            self.resulttext.value = f'エラーが発生しました: {e}'
++            self.result_plain_text.value = tr('common_error_occurred', self.langcode, error=e)
++            self.resulttext.value = tr('common_error_occurred', self.langcode, error=e)
+             self.open_result_page()
+         finally:
+             self.ocr_btn.disabled = False
+@@ -926,12 +971,21 @@ def main(page: ft.Page):
+ 
+     config_obj = default_config | load_obj
+ 
++    ui_locales = {
++        'ja': ft.Locale('ja', 'JP'),
++        'en': ft.Locale('en', 'US'),
++        'zh': ft.Locale('zh', 'CN'),
++    }
++    if config_obj.get('langcode') not in ui_locales:
++        config_obj['langcode'] = 'ja'
++
+     page.locale_configuration = ft.LocaleConfiguration(
+         supported_locales=[
+             ft.Locale('ja', 'JP'),
+             ft.Locale('en', 'US'),
++            ft.Locale('zh', 'CN'),
+         ],
+-        current_locale=ft.Locale('ja', 'JP') if config_obj['langcode'] == 'ja' else ft.Locale('en', 'US'),
++        current_locale=ui_locales[config_obj['langcode']],
+     )
+ 
+     def save_config():
+@@ -941,11 +995,11 @@ def main(page: ft.Page):
+ 
+     def handle_locale_change(e):
+         index = e.control.selected_index
+-        if index == 0:
+-            page.locale_configuration.current_locale = ft.Locale('ja', 'JP')
+-        elif index == 1:
+-            page.locale_configuration.current_locale = ft.Locale('en', 'US')
+-        config_obj['langcode'] = page.locale_configuration.current_locale.language_code
++        if index is None or index < 0 or index >= len(UI_LANGCODES):
++            index = 0
++        langcode = UI_LANGCODES[index]
++        page.locale_configuration.current_locale = ui_locales[langcode]
++        config_obj['langcode'] = langcode
+         save_config()
+         page.update()
+         renderui()
+@@ -1262,7 +1316,7 @@ def main(page: ft.Page):
+                 return
+             ocr_cancel_event.set()
+             stop_ocr_btn.disabled=True
+-            progressmessage.value=TRANSLATIONS["main_ocr_cancel_requested"][config_obj["langcode"]]
++            progressmessage.value=tr("main_ocr_cancel_requested", config_obj["langcode"])
+             page.update()
+ 
+         async def ocr_button_result(e):
+@@ -1454,13 +1508,11 @@ def main(page: ft.Page):
+                     if cancelled:
+                         break
+                 if cancelled:
+-                    progressmessage.value=TRANSLATIONS["main_ocr_cancelled"][config_obj["langcode"]].format(
++                    progressmessage.value=tr("main_ocr_cancelled", config_obj["langcode"]).format(
+                         completed=completed_count,total=allsum,elapsed=time.time()-allstart
+                     )
+-                elif config_obj['langcode'] == 'ja':
+-                    progressmessage.value = '{} 件OCR完了 / 所要時間 {:.2f} 秒'.format(allsum, time.time() - allstart)
+                 else:
+-                    progressmessage.value = '{} items completed / Total time {:.2f} sec'.format(allsum, time.time() - allstart)
++                    progressmessage.value = tr('main_ocr_completed', config_obj['langcode'], count=allsum, elapsed=time.time() - allstart)
+                 progressmessage.update()
+ 
+                 if chkbx_tei.value and len(tei_jsonobjlist)>0:
+@@ -1543,10 +1595,7 @@ def main(page: ft.Page):
+                 if ext == 'pdf':
+                     pdf_job_list.append(selected_file_path)
+                     filestem = os.path.basename(selected_file_path)[:-4]
+-                    if config_obj['langcode'] == 'ja':
+-                        progressmessage.value = 'pdfファイルの前処理中…… {} '.format(selected_file_path)
+-                    else:
+-                        progressmessage.value = 'preprocessing pdf…… {} '.format(selected_file_path)
++                    progressmessage.value = tr('main_pdf_preprocess_start', config_obj['langcode'], path=selected_file_path)
+                     parts_control(True)
+                     page.update()
+                     for p in glob.glob(os.path.join(PDFTMPPATH, '*.jpg')):
+@@ -1554,10 +1603,7 @@ def main(page: ft.Page):
+                             os.remove(p)
+                     os.makedirs(PDFTMPPATH, exist_ok=True)
+                     await asyncio.to_thread(render_pdf_preview, selected_file_path, filestem)
+-                    if config_obj['langcode'] == 'ja':
+-                        progressmessage.value = 'pdfファイルの前処理完了'
+-                    else:
+-                        progressmessage.value = 'Preprocessing of pdf complete'
++                    progressmessage.value = tr('main_pdf_preprocess_done', config_obj['langcode'])
+                     parts_control(False)
+                     page.update()
+                 else:
+@@ -1621,10 +1667,7 @@ def main(page: ft.Page):
+                         else:
+                             filestem = os.path.splitext(filename)[0]
+ 
+-                        if config_obj['langcode'] == 'ja':
+-                            progressmessage.value = 'pdfファイルの前処理中…… {} '.format(inputpath)
+-                        else:
+-                            progressmessage.value = 'preprocessing pdf…… {} '.format(inputpath)
++                        progressmessage.value = tr('main_pdf_preprocess_start', config_obj['langcode'], path=inputpath)
+                         page.update()
+ 
+                         try:
+@@ -1632,10 +1675,7 @@ def main(page: ft.Page):
+                         except Exception as err:
+                             print(f'Error processing {inputpath}: {err}')
+ 
+-                if config_obj['langcode'] == 'ja':
+-                    progressmessage.value = '処理完了'
+-                else:
+-                    progressmessage.value = 'Processing complete'
++                progressmessage.value = tr('main_process_complete', config_obj['langcode'])
+ 
+                 selector.set_image(inputpathlist)
+ 
+@@ -1763,7 +1803,7 @@ def main(page: ft.Page):
+             visible=not bool(config_obj.get('result_markdown_display', False))
+         )
+         preview_view_switch = ft.Switch(
+-            label='整形表示（Markdown）',
++            label=tr('common_view_markdown', config_obj['langcode']),
+             value=bool(config_obj.get('result_markdown_display', False)),
+             on_change=change_preview_view_mode,
+         )
+@@ -1775,19 +1815,19 @@ def main(page: ft.Page):
+         selected_output_path = ft.Text(config_obj['selected_output_path'], selectable=True)
+         current_visualizeimgname = ft.Text(selectable=True)
+         progressmessage = ft.Text(width=400, selectable=True)
+-        chkbx_visualize = ft.Checkbox(label=TRANSLATIONS['main_visualize_label'][config_obj['langcode']], value=True, key='visualize')
+-        chkbx_json = ft.Checkbox(label='JSON形式', value=config_obj['json'], key='output_json')
+-        chkbx_txt = ft.Checkbox(label='TXT形式', value=config_obj['txt'], key='output_txt')
+-        chkbx_markdown = ft.Checkbox(label='Markdown形式（.md）', value=config_obj.get('markdown', False), key='output_markdown')
+-        chkbx_xml = ft.Checkbox(label='XML形式', value=config_obj['xml'], key='output_xml')
+-        chkbx_tei = ft.Checkbox(label='TEI形式', value=config_obj['tei'], key='output_tei')
+-        chkbx_pdf = ft.Checkbox(label='透明テキスト付PDF', value=config_obj['pdf'], on_change=change_pdfstatus, key='output_pdf')
+-        chkbx_pdf_viztxt = ft.Checkbox(label='PDFに青色で文字を重ねる', value=config_obj['pdf_viztxt'], disabled=not chkbx_pdf.value, key='output_pdf_visible_text')
+-        chkbx_pdf_merge = ft.Checkbox(label='出力ファイルを1つのpdfにまとめる', value=config_obj['pdf_merge'], disabled=not chkbx_pdf.value, key='output_pdf_merge')
+-        chkbx_pdf_page_output = ft.Checkbox(label='複数ページPDFを入力とする時はTXT/JSON/XML/TEIをページ毎に出力する', value=config_obj.get('pdf_page_output', True), key='output_pdf_page_output')
+-        pdf_resolution_textfield = ft.TextField(label='pdfの出力解像度を指定する', value=str(config_obj['pdf_resolution']), width=200, disabled=not chkbx_pdf.value, key='output_pdf_resolution')
++        chkbx_visualize = ft.Checkbox(label=tr('main_visualize_label', config_obj['langcode']), value=True, key='visualize')
++        chkbx_json = ft.Checkbox(label=tr('customize_output_json', config_obj['langcode']), value=config_obj['json'], key='output_json')
++        chkbx_txt = ft.Checkbox(label=tr('customize_output_txt', config_obj['langcode']), value=config_obj['txt'], key='output_txt')
++        chkbx_markdown = ft.Checkbox(label=tr('customize_output_markdown', config_obj['langcode']), value=config_obj.get('markdown', False), key='output_markdown')
++        chkbx_xml = ft.Checkbox(label=tr('customize_output_xml', config_obj['langcode']), value=config_obj['xml'], key='output_xml')
++        chkbx_tei = ft.Checkbox(label=tr('customize_output_tei', config_obj['langcode']), value=config_obj['tei'], key='output_tei')
++        chkbx_pdf = ft.Checkbox(label=tr('customize_output_pdf', config_obj['langcode']), value=config_obj['pdf'], on_change=change_pdfstatus, key='output_pdf')
++        chkbx_pdf_viztxt = ft.Checkbox(label=tr('customize_output_pdf_viztxt', config_obj['langcode']), value=config_obj['pdf_viztxt'], disabled=not chkbx_pdf.value, key='output_pdf_visible_text')
++        chkbx_pdf_merge = ft.Checkbox(label=tr('customize_output_pdf_merge', config_obj['langcode']), value=config_obj['pdf_merge'], disabled=not chkbx_pdf.value, key='output_pdf_merge')
++        chkbx_pdf_page_output = ft.Checkbox(label=tr('customize_output_pdf_page_output', config_obj['langcode']), value=config_obj.get('pdf_page_output', True), key='output_pdf_page_output')
++        pdf_resolution_textfield = ft.TextField(label=tr('customize_output_pdf_resolution', config_obj['langcode']), value=str(config_obj['pdf_resolution']), width=200, disabled=not chkbx_pdf.value, key='output_pdf_resolution')
+         chkbx_text_daisy = ft.Checkbox(
+-            label='テキストDAISY形式（DAISY 3）',
++            label=tr('customize_output_text_daisy', config_obj['langcode']),
+             value=config_obj['text_daisy'],
+             key='output_text_daisy',
+         )
+@@ -1797,19 +1837,19 @@ def main(page: ft.Page):
+             else None
+         )
+         file_upload_btn = ft.Button(
+-            TRANSLATIONS['main_file_upload_btn'][config_obj['langcode']],
++            tr('main_file_upload_btn', config_obj['langcode']),
+             icon=ft.Icons.UPLOAD_FILE,
+             on_click=pick_files_result,
+             key='select_input_file',
+         )
+         directory_upload_btn = ft.Button(
+-            TRANSLATIONS['main_directory_upload_btn'][config_obj['langcode']],
++            tr('main_directory_upload_btn', config_obj['langcode']),
+             icon=ft.Icons.FOLDER_OPEN,
+             on_click=pick_directory_result,
+             key='select_input_directory',
+         )
+         directory_output_btn = ft.Button(
+-            TRANSLATIONS['main_directory_output_btn'][config_obj['langcode']],
++            tr('main_directory_output_btn', config_obj['langcode']),
+             on_click=pick_output_result,
+             key='select_output_directory',
+         )
+@@ -1824,7 +1864,7 @@ def main(page: ft.Page):
+             key='run_ocr',
+         )
+         stop_ocr_btn=ft.Button(
+-            content=TRANSLATIONS["main_stop_ocr_btn"][config_obj["langcode"]],
++            content=tr("main_stop_ocr_btn", config_obj["langcode"]),
+             on_click=request_ocr_cancel,
+             disabled=True,
+             key='stop_ocr')
+@@ -1848,17 +1888,17 @@ def main(page: ft.Page):
+             height=300,
+             expand=True,
+         )
+-        preview_prev_btn = ft.Button(content=TRANSLATIONS['main_prev_btn'][config_obj['langcode']], on_click=prev_image, disabled=True)
+-        preview_next_btn = ft.Button(content=TRANSLATIONS['main_next_btn'][config_obj['langcode']], on_click=next_image, disabled=True)
++        preview_prev_btn = ft.Button(content=tr('main_prev_btn', config_obj['langcode']), on_click=prev_image, disabled=True)
++        preview_next_btn = ft.Button(content=tr('main_next_btn', config_obj['langcode']), on_click=next_image, disabled=True)
+         customize_btn = ft.Button(
+-            TRANSLATIONS['main_customize_btn'][config_obj['langcode']],
++            tr('main_customize_btn', config_obj['langcode']),
+             on_click=lambda e: page.show_dialog(customize_dlg_modal),
+             key='customize_output',
+         )
+         customize_dlg_modal = ft.AlertDialog(
+             modal=True,
+-            title=ft.Text(TRANSLATIONS['customize_dlg_modal_title'][config_obj['langcode']]),
+-            content=ft.Text(TRANSLATIONS['customize_dlg_modal_explain'][config_obj['langcode']]),
++            title=ft.Text(tr('customize_dlg_modal_title', config_obj['langcode'])),
++            content=ft.Text(tr('customize_dlg_modal_explain', config_obj['langcode'])),
+             actions=[
+                 ft.Row([chkbx_txt,chkbx_json]),
+                 #chkbx_markdown,
+@@ -1923,6 +1963,23 @@ def main(page: ft.Page):
+             if DATA_POOL_FEATURE is not None
+             else []
+         )
++        # 可选功能模块（llm / data_pool / table_structure）不在本仓库中，
++        # 无法调用 tr()。这里对它们创建的控件树做一次"原文 → 当前语言"的兜底替换；
++        # 未命中的日文文案可用 NDLOCR_GUI_DUMP_UNTRANSLATED=1 导出后补进字典。
++        untranslated_feature_strings = set()
++        for feature_control in (
++            datapool_header_controls,
++            chkbx_table_structure,
++            getattr(capture_tool, 'cb_table_structure', None),
++            getattr(capture_tool, 'dialog', None),
++            getattr(selector, 'dialog', None),
++        ):
++            localize_tree(
++                feature_control,
++                config_obj['langcode'],
++                untranslated_feature_strings,
++            )
++        dump_untranslated_strings(untranslated_feature_strings)
+ 
+         crop_btn = ft.Button(
+             content='Crop&OCR',
+@@ -1935,7 +1992,7 @@ def main(page: ft.Page):
+             key='crop_ocr',
+         )
+         cap_btn = ft.Button(
+-            content=TRANSLATIONS['main_cap_btn'][config_obj['langcode']],
++            content=tr('main_cap_btn', config_obj['langcode']),
+             on_click=capture_tool.start_capture,
+             style=ft.ButtonStyle(
+                 padding=10,
+@@ -1944,12 +2001,16 @@ def main(page: ft.Page):
+             disabled=True,
+             key='capture_ocr',
+         )
+-        explain_label = ft.Text(TRANSLATIONS['main_explain'][config_obj['langcode']])
++        explain_label = ft.Text(tr('main_explain', config_obj['langcode']))
+         localebutton = ft.CupertinoSlidingSegmentedButton(
+-            selected_index=0 if config_obj['langcode'] == 'ja' else 1,
++            selected_index=(
++                UI_LANGCODES.index(config_obj['langcode'])
++                if config_obj['langcode'] in UI_LANGCODES
++                else 0
++            ),
+             thumb_color=ft.Colors.BLUE_400,
+             on_change=handle_locale_change,
+-            controls=[ft.Text('日本語'), ft.Text('English')],
++            controls=[ft.Text(UI_LANGCODE_TITLES[code]) for code in UI_LANGCODES],
+             key='locale',
+         )
+         page.add(
+@@ -1965,13 +2026,13 @@ def main(page: ft.Page):
+             ft.Row([
+                 file_upload_btn,
+                 directory_upload_btn,
+-                ft.Text(TRANSLATIONS['main_target_label'][config_obj['langcode']]),
++                ft.Text(tr('main_target_label', config_obj['langcode'])),
+                 selected_input_path,
+             ]),
+             ft.Divider(),
+             ft.Row([
+                 directory_output_btn,
+-                ft.Text(TRANSLATIONS['main_output_label'][config_obj['langcode']]),
++                ft.Text(tr('main_output_label', config_obj['langcode'])),
+                 selected_output_path,
+             ]),
+             ft.Divider(),
+@@ -1988,7 +2049,7 @@ def main(page: ft.Page):
+                 ]),
+             ]),
+             ft.Divider(),
+-            ft.Row([ft.Text(TRANSLATIONS['main_preview_label'][config_obj['langcode']]), preview_prev_btn, preview_next_btn, current_visualizeimgname]),
++            ft.Row([ft.Text(tr('main_preview_label', config_obj['langcode'])), preview_prev_btn, preview_next_btn, current_visualizeimgname]),
+             ft.Row([preview_image_int, preview_text_col]),
+         )
+         page.update()
+@@ -2028,24 +2089,16 @@ def main(page: ft.Page):
+                     tool.table_recognizer = origin_table_recognizer
+ 
+                 progressbar.value = 0
+-                if config_obj['langcode'] == 'ja':
+-                    if TABLE_STRUCTURE_FEATURE is None:
+-                        progressmessage.value = f'OCRモデル準備完了 ({model_state["elapsed"]:.1f}秒)'
+-                    elif model_state.get('table_error') is None:
+-                        progressmessage.value = f'OCR / 表推定モデル準備完了 ({model_state["elapsed"]:.1f}秒)'
+-                    else:
+-                        progressmessage.value = f'OCRモデル準備完了 / 表推定初期化失敗 ({model_state["elapsed"]:.1f}秒)'
+-                else:
+-                    if TABLE_STRUCTURE_FEATURE is None:
+-                        progressmessage.value = f'OCR models ready ({model_state["elapsed"]:.1f} sec)'
+-                    elif model_state.get('table_error') is None:
+-                        progressmessage.value = f'OCR / TableInfer models ready ({model_state["elapsed"]:.1f} sec)'
+-                    else:
+-                        progressmessage.value = f'OCR models ready / TableInfer models unavailable ({model_state["elapsed"]:.1f} sec)'
++                progressmessage.value = build_models_ready_message(
++                    config_obj['langcode'],
++                    model_state['elapsed'],
++                    TABLE_STRUCTURE_FEATURE is not None,
++                    model_state.get('table_error'),
++                )
+             except Exception as ex:
+                 model_state['error'] = ex
+                 progressbar.value = 0
+-                progressmessage.value = f'OCR model initialization failed: {ex}'
++                progressmessage.value = tr('main_model_init_failed', config_obj['langcode'], error=ex)
+             finally:
+                 model_state['loading'] = False
+                 parts_control(False)
+@@ -2054,28 +2107,17 @@ def main(page: ft.Page):
+         if models_are_ready():
+             parts_control(False)
+             if model_state['elapsed'] is not None:
+-                if config_obj['langcode'] == 'ja':
+-                    if TABLE_STRUCTURE_FEATURE is None:
+-                        progressmessage.value = f'OCRモデル準備完了 ({model_state["elapsed"]:.1f}秒)'
+-                    elif model_state.get('table_error') is None:
+-                        progressmessage.value = f'OCR / 表推定モデル準備完了 ({model_state["elapsed"]:.1f}秒)'
+-                    else:
+-                        progressmessage.value = f'OCRモデル準備完了 / 表推定初期化失敗 ({model_state["elapsed"]:.1f}秒)'
+-                else:
+-                    if TABLE_STRUCTURE_FEATURE is None:
+-                        progressmessage.value = f'OCR models ready ({model_state["elapsed"]:.1f} sec)'
+-                    elif model_state.get('table_error') is None:
+-                        progressmessage.value = f'OCR / TableInfer models ready ({model_state["elapsed"]:.1f} sec)'
+-                    else:
+-                        progressmessage.value = f'OCR models ready / TableInfer models unavailable ({model_state["elapsed"]:.1f} sec)'
++                progressmessage.value = build_models_ready_message(
++                    config_obj['langcode'],
++                    model_state['elapsed'],
++                    TABLE_STRUCTURE_FEATURE is not None,
++                    model_state.get('table_error'),
++                )
+             page.update()
+         elif not model_state['loading']:
+             model_state['loading'] = True
+             progressbar.value = None
+-            if config_obj['langcode'] == 'ja':
+-                progressmessage.value = 'OCRモデルを読み込み中…'
+-            else:
+-                progressmessage.value = 'Loading OCR models…'
++            progressmessage.value = tr('main_models_loading', config_obj['langcode'])
+             localebutton.disabled = True
+             page.update()
+             page.run_task(initialize_models)

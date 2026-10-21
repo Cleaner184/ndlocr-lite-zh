@@ -1,0 +1,65 @@
+[project]
+name = "ndlocr-lite-gui"
+version = "1.0.0"
+description = ""
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+authors = [
+    { name = "National_Diet_Library", email = "lab@ndl.go.jp" }
+]
+
+dynamic = ["dependencies"]
+
+[project.optional-dependencies]
+dev = [
+    "flet[all,test]==0.86.5",
+]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt"] }
+
+[tool.flet]
+# org name in reverse domain name notation, e.g. "com.mycompany".
+# Combined with project.name to build bundle ID for iOS and Android apps
+org = "jp.go.ndl"
+
+# project display name that is used as an app title on Android and iOS home screens,
+# shown in window titles and about app dialogs on desktop.
+product = "ndlocr-lite-gui"
+
+# company name to display in about app dialogs
+company = "National_Diet_Library"
+
+# copyright text to display in about app dialogs
+copyright = "Copyright (C) 2025 by National Diet Library"
+
+[tool.flet.app]
+path = "."
+exclude = [".flet", ".venv", "__pycache__", "tests", ".git"]
+
+# OpenCV imports cv2/config.py dynamically by filename. Flet 0.86 compiles and
+# removes package sources by default, which makes cv2 fail at startup.
+[tool.flet.compile]
+app = true
+packages = false
+
+[tool.uv]
+dev-dependencies = [
+    "flet[all,test]==0.86.5",
+]
+
+[tool.poetry]
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+flet = {extras = ["all", "test"], version = "0.86.5"}
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.flet.flutter.pubspec.dependency_overrides]
+connectivity_plus="6.0.5"
+# jni_flutter / shared_preferences_android 的生成代码断言 jni ^1.1.0，而 flet 模板默认覆盖成 1.0.0，
+# 会在 Dart 编译阶段报 “The generated bindings expect package:jni ^1.1.0, but 1.0.x was imported”。
+jni="^1.1.0"

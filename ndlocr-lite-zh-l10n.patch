@@ -1,0 +1,459 @@
+﻿diff --git "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\src/uicomponent/localelabel.py" "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\src/uicomponent/localelabel.py"
+index 29cbfb7..38a49fd 100644
+--- "a/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\head\\src/uicomponent/localelabel.py"
++++ "b/C:\\Users\\\351\243\236\350\214\203\\AppData\\Local\\Temp\\ndlocr_zh\\repo\\src/uicomponent/localelabel.py"
+@@ -1,118 +1,430 @@
++"""NDLOCR-Lite GUI 的界面文本字典。
++
++支持的语言代码：
++    ja : 日本語（默认）
++    en : English
++    zh : 简体中文
++
++新增语言时，在每个条目里补上对应的语言代码即可；缺项会按
++DEFAULT_LANGCODE -> FALLBACK_LANGCODES 的顺序回退，不会抛 KeyError。
++"""
++
++import re
++
++DEFAULT_LANGCODE = 'ja'
++FALLBACK_LANGCODES = ('en', 'ja')
++
++
++def get_text(key: str, langcode: str = DEFAULT_LANGCODE, **kwargs) -> str:
++    """按语言代码取出界面文本。
++
++    Args:
++        key: TRANSLATIONS 中的条目名。
++        langcode: 语言代码（ja / en / zh）。
++        **kwargs: 需要代入 {name} 占位符的值。
++
++    Returns:
++        该语言的文本；找不到时回退到 en / ja，最后回退为 key 本身。
++    """
++    entry = TRANSLATIONS.get(key)
++    if entry is None:
++        return key
++    text = entry.get(langcode)
++    if text is None:
++        for fallback in FALLBACK_LANGCODES:
++            if fallback in entry:
++                text = entry[fallback]
++                break
++    if text is None:
++        text = key
++    if kwargs:
++        try:
++            text = text.format(**kwargs)
++        except (KeyError, IndexError, ValueError):
++            return text
++    return text
++
++
+ TRANSLATIONS = {
+     "main_explain":{
+         "ja":"処理対象と出力先を選択して「OCR」ボタンを押してください",
+-        "en":"Please select target images and output folder, then press OCR"
++        "en":"Please select target images and output folder, then press OCR",
++        "zh":"请选择要处理的图片和输出目录，然后点击「OCR」按钮",
+     },
+     "imageselector_cropocr_btn":{
+         "ja":"切り抜きOCR",
+-        "en":"Crop OCR"
++        "en":"Crop OCR",
++        "zh":"裁剪 OCR",
+     },
+     "imageselector_zoom_btn":{
+         "ja":"拡大する",
+-        "en":"Zoom"
++        "en":"Zoom",
++        "zh":"放大查看",
+     },
+     "imageselector_prev_btn":{
+         "ja":"前の画像",
+-        "en":"Prev Image"
++        "en":"Prev Image",
++        "zh":"上一张图片",
+     },
+     "imageselector_next_btn":{
+         "ja":"次の画像",
+-        "en":"Next Image"
++        "en":"Next Image",
++        "zh":"下一张图片",
+     },
+     "imageselector_result_title":{
+         "ja":"切り抜きOCR結果",
+-        "en":"OCR Result"
++        "en":"OCR Result",
++        "zh":"裁剪 OCR 结果",
+     },
+     "capturetool_retry_btn":{
+         "ja":"再キャプチャ",
+-        "en":"Retake"
++        "en":"Retake",
++        "zh":"重新截屏",
+     },
+     "capturetool_fixregion":{
+         "ja":"範囲固定",
+-        "en":"Fix Region"
++        "en":"Fix Region",
++        "zh":"固定选区",
+     },
+     "capturetool_ocr_button":{
+         "ja":"OCR実行",
+-        "en":"OCR"
++        "en":"OCR",
++        "zh":"执行 OCR",
+     },
+     "capturetool_result_title":{
+         "ja":"キャプチャ結果",
+-        "en":"Captured Image"
++        "en":"Captured Image",
++        "zh":"截屏结果",
+     },
+     "capturetool_resultocr_title":{
+         "ja":"OCR結果",
+-        "en":"OCR Result"
++        "en":"OCR Result",
++        "zh":"OCR 识别结果",
+     },
+     "main_file_upload_btn":{
+         "ja":"画像ファイルを処理する",
+-        "en":"Process an Image"
++        "en":"Process an Image",
++        "zh":"处理图片文件",
+     },
+     "main_directory_upload_btn":{
+         "ja":"フォルダ内の画像を処理する",
+         "en":"Process Images in a Folder",
++        "zh":"处理文件夹内的图片",
+     },
+     "main_directory_output_btn":{
+         "ja":"出力先を選択する",
+         "en":"Select Output Directory",
++        "zh":"选择输出目录",
+     },
+     "main_stop_ocr_btn":{
+         "ja":"OCRを中断",
+         "en":"Stop OCR",
++        "zh":"中断 OCR",
+     },
+     "main_ocr_cancel_requested":{
+         "ja":"中断を要求しました。現在の処理が終わり次第停止します……",
+         "en":"Stop requested. OCR will stop after the current operation……",
++        "zh":"已请求中断，当前任务处理完成后将停止……",
+     },
+     "main_ocr_cancelled":{
+         "ja":"OCRを中断しました（{completed}/{total}画像完了 / 所要時間 {elapsed:.2f}秒）",
+         "en":"OCR stopped ({completed}/{total} images completed / Total time {elapsed:.2f} sec)",
++        "zh":"已中断 OCR（已完成 {completed}/{total} 张图片 / 耗时 {elapsed:.2f} 秒）",
++    },
++    "main_ocr_completed":{
++        "ja":"{count} 件OCR完了 / 所要時間 {elapsed:.2f} 秒",
++        "en":"{count} items completed / Total time {elapsed:.2f} sec",
++        "zh":"已完成 {count} 个文件的 OCR / 耗时 {elapsed:.2f} 秒",
++    },
++    "main_pdf_preprocess_start":{
++        "ja":"pdfファイルの前処理中…… {path}",
++        "en":"preprocessing pdf…… {path}",
++        "zh":"正在预处理 PDF 文件…… {path}",
++    },
++    "main_pdf_preprocess_done":{
++        "ja":"pdfファイルの前処理完了",
++        "en":"Preprocessing of pdf complete",
++        "zh":"PDF 预处理完成",
++    },
++    "main_process_complete":{
++        "ja":"処理完了",
++        "en":"Processing complete",
++        "zh":"处理完成",
++    },
++    "main_models_loading":{
++        "ja":"OCRモデルを読み込み中…",
++        "en":"Loading OCR models…",
++        "zh":"正在加载 OCR 模型…",
++    },
++    "main_models_ready":{
++        "ja":"OCRモデル準備完了 ({elapsed:.1f}秒)",
++        "en":"OCR models ready ({elapsed:.1f} sec)",
++        "zh":"OCR 模型加载完成（{elapsed:.1f} 秒）",
++    },
++    "main_models_ready_with_table":{
++        "ja":"OCR / 表推定モデル準備完了 ({elapsed:.1f}秒)",
++        "en":"OCR / TableInfer models ready ({elapsed:.1f} sec)",
++        "zh":"OCR / 表格结构识别模型加载完成（{elapsed:.1f} 秒）",
++    },
++    "main_models_ready_table_failed":{
++        "ja":"OCRモデル準備完了 / 表推定初期化失敗 ({elapsed:.1f}秒)",
++        "en":"OCR models ready / TableInfer models unavailable ({elapsed:.1f} sec)",
++        "zh":"OCR 模型加载完成 / 表格结构识别初始化失败（{elapsed:.1f} 秒）",
++    },
++    "main_model_init_failed":{
++        "ja":"OCRモデル初期化失敗: {error}",
++        "en":"OCR model initialization failed: {error}",
++        "zh":"OCR 模型初始化失败：{error}",
+     },
+     "main_prev_btn":{
+         "ja":"前の画像",
+-        "en":"Prev Image"
++        "en":"Prev Image",
++        "zh":"上一张图片",
+     },
+     "main_next_btn":{
+         "ja":"次の画像",
+-        "en":"Next Image"
++        "en":"Next Image",
++        "zh":"下一张图片",
+     },
+     "main_cap_btn":{
+         "ja":"キャプチャモード",
+-        "en":"ScreenCapture Mode"
++        "en":"ScreenCapture Mode",
++        "zh":"截屏模式",
+     },
+     "main_customize_btn":{
+         "ja":"出力形式の選択",
+-        "en":"Custom Setting"
++        "en":"Custom Setting",
++        "zh":"选择输出格式",
+     },
+     "main_target_label":{
+         "ja":"処理対象：",
+-        "en":"Target Path:"
++        "en":"Target Path:",
++        "zh":"处理对象：",
+     },
+     "main_output_label":{
+         "ja":"出力先：",
+-        "en":"Output Path:"
++        "en":"Output Path:",
++        "zh":"输出位置：",
+     },
+     "main_preview_label":{
+         "ja":"処理結果プレビュー",
+-        "en":"Preview of Result"
++        "en":"Preview of Result",
++        "zh":"识别结果预览",
+     },
+     "main_visualize_label":{
+         "ja":"認識箇所の可視化画像を保存する",
+-        "en":"Save Visualization Results"
++        "en":"Save Visualization Results",
++        "zh":"保存识别区域的标注图像",
+     },
+     "customize_dlg_modal_title":{
+         "ja":"設定",
+-        "en":"Setting"        
++        "en":"Setting",
++        "zh":"设置",
+     },
+     "customize_dlg_modal_explain":{
+         "ja":"出力形式を選択してください",
+-        "en":"Please select output format"        
++        "en":"Please select output format",
++        "zh":"请选择输出格式",
++    },
++    "customize_output_txt":{
++        "ja":"TXT形式",
++        "en":"TXT format",
++        "zh":"TXT 格式",
++    },
++    "customize_output_json":{
++        "ja":"JSON形式",
++        "en":"JSON format",
++        "zh":"JSON 格式",
++    },
++    "customize_output_markdown":{
++        "ja":"Markdown形式（.md）",
++        "en":"Markdown format (.md)",
++        "zh":"Markdown 格式（.md）",
++    },
++    "customize_output_xml":{
++        "ja":"XML形式",
++        "en":"XML format",
++        "zh":"XML 格式",
++    },
++    "customize_output_tei":{
++        "ja":"TEI形式",
++        "en":"TEI format",
++        "zh":"TEI 格式",
++    },
++    "customize_output_pdf":{
++        "ja":"透明テキスト付PDF",
++        "en":"PDF with invisible text layer",
++        "zh":"带透明文本层的 PDF",
++    },
++    "customize_output_pdf_viztxt":{
++        "ja":"PDFに青色で文字を重ねる",
++        "en":"Overlay recognized text in blue on the PDF",
++        "zh":"在 PDF 上叠加蓝色文字",
++    },
++    "customize_output_pdf_merge":{
++        "ja":"出力ファイルを1つのpdfにまとめる",
++        "en":"Merge output files into one PDF",
++        "zh":"将输出合并为一个 PDF",
++    },
++    "customize_output_pdf_page_output":{
++        "ja":"複数ページPDFを入力とする時はTXT/JSON/XML/TEIをページ毎に出力する",
++        "en":"When the input is a multi-page PDF, output TXT/JSON/XML/TEI per page",
++        "zh":"输入为多页 PDF 时，按页分别输出 TXT/JSON/XML/TEI",
++    },
++    "customize_output_pdf_resolution":{
++        "ja":"pdfの出力解像度を指定する",
++        "en":"PDF output resolution",
++        "zh":"指定 PDF 输出分辨率",
++    },
++    "customize_output_text_daisy":{
++        "ja":"テキストDAISY形式（DAISY 3）",
++        "en":"Text DAISY format (DAISY 3)",
++        "zh":"文本 DAISY 格式（DAISY 3）",
++    },
++    "common_view_markdown":{
++        "ja":"整形表示（Markdown）",
++        "en":"Formatted view (Markdown)",
++        "zh":"格式化显示（Markdown）",
++    },
++    "common_error_occurred":{
++        "ja":"エラーが発生しました: {error}",
++        "en":"An error occurred: {error}",
++        "zh":"发生错误：{error}",
+     },
+     "common_cancel":{
+         "ja":"キャンセル",
+         "en":"Dismiss",
++        "zh":"取消",
+     },
+     "common_close":{
+         "ja":"閉じる",
+         "en":"Close",
++        "zh":"关闭",
+     }
+-}
+\ No newline at end of file
++}
++
++
++# ---------------------------------------------------------------------------
++# 可选功能模块（src/optional_features/llm.py / data_pool.py / table_structure.py）
++# 的接入支持
++#
++# 这三个模块随发布包分发，不在公开仓库里，因此无法直接调用 get_text()。
++# 提供两种接入方式，都不需要改动模块源码：
++#
++#   1) register_translations({...})
++#      模块把自己的文案登记进同一套字典（键名建议加前缀 llm_ / datapool_ /
++#      table_structure_），之后即可像内置文案一样维护 zh / en 译文。
++#
++#   2) translate_literal(text, langcode)
++#      控件里已经写死的日文/英文原文，按"原文 → 译文"直接替换。
++#      只要字典里某条目的 ja（或 en）值与该原文完全一致就能命中，
++#      所以模块一行代码都不用改，对 .pyc 发布版同样有效。
++# ---------------------------------------------------------------------------
++
++_LITERAL_INDEX_CACHE = {}
++
++
++def _build_literal_index():
++    """构建 {原文: {目标语言: 译文}} 索引，供 translate_literal() 使用。"""
++    index = {}
++    for entry in TRANSLATIONS.values():
++        for source_lang in ('ja', 'en'):
++            source_text = entry.get(source_lang)
++            if not source_text:
++                continue
++            targets = index.setdefault(source_text, {})
++            for target_lang, translated in entry.items():
++                if target_lang == source_lang:
++                    continue
++                targets.setdefault(target_lang, translated)
++    return index
++
++
++def translate_literal(text, langcode):
++    """把控件里写死的原文替换为目标语言；没有对应译文时原样返回。"""
++    if not isinstance(text, str) or not text or langcode == 'ja':
++        return text
++    if not _LITERAL_INDEX_CACHE:
++        _LITERAL_INDEX_CACHE.update(_build_literal_index())
++    targets = _LITERAL_INDEX_CACHE.get(text.strip())
++    if not targets:
++        return text
++    return targets.get(langcode) or text
++
++
++def register_translations(entries):
++    """合并外部（可选功能模块）提供的文案条目。
++
++    Args:
++        entries: {键名: {语言代码: 文本}}，与 TRANSLATIONS 同构。
++                 已存在的键只补齐/覆盖对应语言，不会丢掉内置译文。
++    """
++    for key, entry in (entries or {}).items():
++        if key in TRANSLATIONS:
++            TRANSLATIONS[key].update(entry)
++        else:
++            TRANSLATIONS[key] = dict(entry)
++    _LITERAL_INDEX_CACHE.clear()
++
++# ---------------------------------------------------------------------------
++# 控件树兜底本地化（不依赖 flet：只按属性名遍历，鸭子类型）
++# ---------------------------------------------------------------------------
++
++CONTROL_TEXT_ATTRS = (
++    'value', 'text', 'label', 'title', 'subtitle', 'tooltip',
++    'hint_text', 'helper_text', 'content', 'message',
++    'prefix_text', 'suffix_text',
++)
++CONTROL_CHILD_ATTRS = (
++    'controls', 'content', 'title', 'label', 'actions', 'subtitle',
++    'leading', 'trailing', 'hint_text', 'helper_text', 'tooltip', 'menu_items',
++)
++_CJK_PATTERN = re.compile('[\u3040-\u30ff\u3400-\u9fff]')
++
++
++def _localize_node(node, langcode, collect_untranslated, depth, seen):
++    if node is None or depth > 20:
++        return
++    if isinstance(node, (list, tuple, set)):
++        for item in node:
++            _localize_node(item, langcode, collect_untranslated, depth + 1, seen)
++        return
++    if not hasattr(node, '__dict__') or id(node) in seen:
++        return
++    seen.add(id(node))
++    for attr in CONTROL_TEXT_ATTRS:
++        try:
++            value = getattr(node, attr, None)
++        except Exception:
++            continue
++        if not isinstance(value, str) or not value.strip():
++            continue
++        translated = translate_literal(value, langcode)
++        if translated != value:
++            try:
++                setattr(node, attr, translated)
++            except Exception:
++                pass
++        elif collect_untranslated is not None and _CJK_PATTERN.search(value):
++            collect_untranslated.add(value.strip())
++    for attr in CONTROL_CHILD_ATTRS:
++        try:
++            child = getattr(node, attr, None)
++        except Exception:
++            continue
++        if child is None or isinstance(child, str):
++            continue
++        _localize_node(child, langcode, collect_untranslated, depth + 1, seen)
++
++
++def localize_tree(root, langcode, collect_untranslated=None):
++    """对第三方模块搭建的控件树做"原文 → 当前语言"的兜底替换。
++
++    可选功能模块（llm / data_pool / table_structure）不在公开仓库中，无法调用
++    get_text()，因此在渲染前对其控件树做一次整体替换：只要字典里某条目的 ja
++    （或 en）译文与该控件上的字符串完全一致就能命中。未命中的日文文案会收集到
++    collect_untranslated 中，便于补齐字典。
++    """
++    if langcode == 'ja':
++        return
++    _localize_node(root, langcode, collect_untranslated, 0, set())

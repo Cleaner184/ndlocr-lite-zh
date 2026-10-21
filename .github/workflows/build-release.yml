@@ -1,0 +1,151 @@
+name: build-release
+
+# 发版流程（借鉴上游 ndl-lab/ndlocr-lite 的 build-flet-cross.yml）：
+#   1. 打 tag 并推送： git tag v1.3.1-zh && git push origin v1.3.1-zh
+#   2. 本工作流在各平台用 flet build 编译，并把产物上传到同名 Release
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "已有 tag（把产物上传到该 tag 的 Release）"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 确保 Release 存在
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes "NDLOCR-Lite 简体中文版 $TAG"
+
+  build:
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-22.04
+            platform: linux
+            asset: ndlocr_lite_zh_linux.tar.gz
+          - runs-on: macos-latest
+            platform: macos
+            asset: ndlocr_lite_zh_macos_apple_silicon.tar.gz
+          - runs-on: macos-15-intel
+            platform: macos
+            arch: x86_64
+            asset: ndlocr_lite_zh_macos_intel.tar.gz
+          - runs-on: windows-2022
+            platform: windows
+            asset: ndlocr_lite_zh_windows.zip
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 与 requirements.txt 中 flet==0.86.5 匹配（上游 CI 同样固定 3.44.8）
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.8"
+
+      - name: 安装 Python 依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 安装 GStreamer（仅 Linux）
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev ninja-build libunwind-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libgstreamer-plugins-bad1.0-dev gstreamer1.0-plugins-base \
+            gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
+            gstreamer1.0-libav gstreamer1.0-tools gstreamer1.0-alsa gstreamer1.0-gl \
+            gstreamer1.0-gtk3 gstreamer1.0-qt5 gstreamer1.0-pulseaudio
+
+      - name: 本地化单测（不依赖 flet）
+        run: python -m unittest ndlocr-lite-gui/tests/test_localization.py -v
+
+      - name: 准备构建目录（把 src 复制进 gui 目录，与上游 CI 一致）
+        shell: bash
+        run: |
+          cd ndlocr-lite-gui
+          cp -r ../src .
+          python src/set_version.py "${TAG#v}"
+
+      - name: flet build（Linux / macOS）
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd ndlocr-lite-gui
+          EXTRA=""
+          if [ -n "${{ matrix.arch }}" ]; then EXTRA="--arch ${{ matrix.arch }}"; fi
+          flet build ${{ matrix.platform }} --output ../dist --build-version "${TAG#v}" $EXTRA
+          mv ../dist/* ../dist/${TAG} 2>/dev/null || true
+
+      - name: flet build（Windows）
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cd ndlocr-lite-gui
+          echo D | xcopy ..\src .\src /E /I /Y
+          python src\set_version.py %TAG:v=%
+          set PYTHONUTF8=1
+          flet build windows --output ..\dist --build-version %TAG:v=%
+
+      - name: 打包产物（Linux / macOS）
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          mkdir -p out
+          tar czf "out/${{ matrix.asset }}" -C dist .
+          ls -lh out
+
+      - name: 打包产物（Windows）
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out | Out-Null
+          Compress-Archive -Path dist\* -DestinationPath "out/${{ matrix.asset }}"
+          Get-ChildItem out | Select-Object Name,Length
+
+      - name: 上传到 Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$TAG" "out/${{ matrix.asset }}" --clobber
+
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: 取消草稿状态（全部产物就绪后发布；已是正式版则跳过）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+        run: |
+          set -e
+          DRAFT=$(gh release view "$TAG" --json isDraft --jq .isDraft)
+          if [ "$DRAFT" = "true" ]; then
+            gh release edit "$TAG" --draft=false
+            echo "已发布草稿 -> 正式"
+          else
+            echo "Release 已是正式版，跳过"
+          fi
