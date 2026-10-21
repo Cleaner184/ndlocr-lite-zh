@@ -1,5 +1,5 @@
 > **简体中文版说明**：本仓库是 ndl-lab/ndlocr-lite 的中文化分支，界面支持 日本語 / English / 简体中文，
-> 并提供可直接双击运行的 Windows 便携版（`windows-build/`）。
+> 并提供可直接双击运行的 Windows 便携版（见 Releases）。
 > 详见 [README.zh-CN.md](./README.zh-CN.md) 与 [中文适配说明.md](./中文适配说明.md)。
 
 # NDLOCR-Liteアプリケーションのリポジトリ
